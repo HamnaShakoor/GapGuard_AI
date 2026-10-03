@@ -1,23 +1,33 @@
-from schemas import RequirementResult, Status
+from typing import List, Tuple
 
-# PLACEHOLDER formula. Team ka asli formula aane pe isko replace karna hai.
+from schemas import GapItem
+
+# PLACEHOLDER formula. Replace with the team's real formula when it is agreed.
 MANDATORY_WEIGHT = 2
 OPTIONAL_WEIGHT = 1
 STATUS_POINTS = {
-    Status.COMPLETE: 1.0,
-    Status.WARNING: 0.5,
-    Status.MISSING: 0.0,
+    "COMPLETE": 1.0,
+    "WARNING": 0.5,
+    "MISSING": 0.0,
 }
 
 
-def compute_score(results: list[RequirementResult]) -> float:
+def compute_score(items: List[GapItem]) -> float:
     """Return readiness score from 0 to 100."""
-    if not results:
+    if not items:
         return 0.0
     earned = 0.0
     total = 0.0
-    for r in results:
-        weight = MANDATORY_WEIGHT if r.requirement.mandatory else OPTIONAL_WEIGHT
+    for item in items:
+        weight = MANDATORY_WEIGHT if item.requirement.mandatory else OPTIONAL_WEIGHT
         total += weight
-        earned += weight * STATUS_POINTS[r.status]
+        earned += weight * STATUS_POINTS[item.status]
     return round(earned / total * 100, 1)
+
+
+def count_statuses(items: List[GapItem]) -> Tuple[int, int, int]:
+    """Return (completed, missing, warnings)."""
+    completed = sum(1 for i in items if i.status == "COMPLETE")
+    missing = sum(1 for i in items if i.status == "MISSING")
+    warnings = sum(1 for i in items if i.status == "WARNING")
+    return completed, missing, warnings
