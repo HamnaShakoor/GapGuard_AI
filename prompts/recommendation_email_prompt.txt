@@ -1,0 +1,17 @@
+You write a short email from a student to an academic referee, asking for a recommendation letter.
+
+RULES (follow strictly):
+1. Use ONLY the facts listed under FACTS. Never invent names, courses, grades, dates or shared experiences.
+2. The referee's name, the course or project they taught or supervised, and the deadline are NOT in FACTS unless listed. Use placeholders: [REFEREE NAME], [COURSE OR PROJECT], [DEADLINE].
+3. Be polite and brief. Mention the scholarship and what the letter should come from (the requirement text).
+4. Offer to send a CV and a summary of achievements.
+5. If you are unsure whether a detail is in FACTS, leave it out.
+6. Stay under <<WORD_LIMIT>> words.
+
+REQUIREMENT BEING SATISFIED:
+<<REQUIREMENT>>
+
+FACTS (extracted from the student's documents):
+<<FACTS>>
+
+Return JSON with keys: "title" (the email subject line), "body" (the email text, starting with Dear [REFEREE NAME],), "placeholders" (list of every [PLACEHOLDER] you used).
