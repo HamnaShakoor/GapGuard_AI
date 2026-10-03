@@ -1,0 +1,30 @@
+[1mdiff --git a/.env.example b/.env.example[m
+[1mindex 95239ce..740bada 100644[m
+[1m--- a/.env.example[m
+[1m+++ b/.env.example[m
+[36m@@ -1,5 +1,5 @@[m
+[31m-LLM_PROVIDER=gemini[m
+[31m-API_KEY=your_key_here[m
+[31m-MODEL_NAME=gemini-2.0-flash[m
+[32m+[m[32mLLM_PROVIDER=groq[m
+[32m+[m[32mAPI_KEY=gsk_your_real_key[m
+[32m+[m[32mMODEL_NAME=llama-3.3-70b-versatile[m
+ MAX_RETRIES=2[m
+ RATE_LIMIT_WAIT=5[m
+\ No newline at end of file[m
+[1mdiff --git a/config.py b/config.py[m
+[1mindex db4d35f..aa597df 100644[m
+[1m--- a/config.py[m
+[1m+++ b/config.py[m
+[36m@@ -7,9 +7,9 @@[m [mload_dotenv()[m
+ BASE_DIR = Path(__file__).resolve().parent[m
+ [m
+ # LLM[m
+[31m-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini").lower()[m
+[32m+[m[32mLLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq").lower()[m
+ API_KEY = os.getenv("API_KEY", "")[m
+[31m-MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.0-flash")[m
+[32m+[m[32mMODEL_NAME = os.getenv("MODEL_NAME", "llama-3.3-70b-versatile")[m
+ MAX_RETRIES = int(os.getenv("MAX_RETRIES", "2"))[m
+ RATE_LIMIT_WAIT = int(os.getenv("RATE_LIMIT_WAIT", "5"))[m
+ [m
