@@ -9,7 +9,7 @@ BASE_DIR = Path(__file__).resolve().parent
 # LLM
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq").lower()
 API_KEY = os.getenv("API_KEY", "")
-MODEL_NAME = os.getenv("MODEL_NAME", "llama-3.3-70b-versatile")
+MODEL_NAME = os.getenv("MODEL_NAME", "openai/gpt-oss-120b")
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", "2"))
 RATE_LIMIT_WAIT = int(os.getenv("RATE_LIMIT_WAIT", "5"))
 
