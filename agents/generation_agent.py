@@ -34,8 +34,25 @@ def _word_limit(req) -> int:
     m = re.search(r"(\d+)\s*words?", f"{req.name} {req.description}", re.I)
     return int(m.group(1)) if m else DEFAULT_WORD_LIMIT
 
+def _checklist_text(report: ReadinessReport) -> str:
+    lines = []
+    for i in report.items:
+        r = i.requirement
+        kind = "mandatory" if r.mandatory else "optional"
+        lines.append(f"- [{i.status}] {r.name} ({kind}): {i.reason}")
+    return "\n".join(lines)
+
 
 def generate(kind: str, report: ReadinessReport, requirement_id: str) -> GeneratedContent:
+    if kind == "checklist":
+        template = (config.PROMPTS_DIR / PROMPT_FILES[kind]).read_text(encoding="utf-8")
+        prompt = template.replace("<<SCORE>>", str(report.score)).replace(
+            "<<ITEMS>>", _checklist_text(report)
+        )
+        draft = call_json(prompt, _Draft)
+        return GeneratedContent(
+            kind=kind, title=draft.title, body=draft.body, placeholders=[]
+        )
     req = next(
         (i.requirement for i in report.items if i.requirement.id == requirement_id),
         None,
