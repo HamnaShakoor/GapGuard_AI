@@ -1,0 +1,30 @@
+You are an expert at reading scholarship requirement documents.
+
+Read the requirements text below and convert it into a structured list of individual requirements.
+
+Rules:
+- Create one item for each separate requirement (one document, one eligibility condition, or one task).
+- "mandatory" is true if the text says must, required, or shall. It is false if the text says optional, may, or recommended.
+- "generatable" is true ONLY if an AI can draft it from the student's facts: a personal statement, a recommendation request email, an application checklist. It is false for things the student must obtain or prove: transcript, CV, GPA, degree, actual recommendation letters.
+- "source_section" is the section number or heading where the requirement appears.
+- "source_page" is the page number if given in the text, otherwise null.
+- Do not invent requirements that are not in the text.
+- Use short ids: R1, R2, R3 and so on.
+
+Respond with JSON only, in exactly this shape:
+{{
+  "requirements": [
+    {{
+      "id": "R1",
+      "title": "short name",
+      "description": "what exactly is required",
+      "mandatory": true,
+      "generatable": false,
+      "source_section": "Section 4",
+      "source_page": 4
+    }}
+  ]
+}}
+
+REQUIREMENTS TEXT:
+{requirements_text}
