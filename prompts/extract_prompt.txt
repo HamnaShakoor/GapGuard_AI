@@ -1,0 +1,15 @@
+You are a key field extraction agent. Extract structured metadata based on the classified document type.
+
+Document Type: {doc_type}
+Extracted Text:
+"""
+{extracted_text}
+"""
+
+Instructions:
+- If CV: Extract name, email, phone, degree, university, gpa, skills, work_experience_years.
+- If Transcript: Extract student_name, university, degree, gpa, total_credits, graduation_year.
+- If CNIC / ID: Extract full_name, cnic_number, father_name, dob.
+- For other document types: Extract key summary details as key-value pairs.
+
+Return a JSON object containing the key details found in the text.
