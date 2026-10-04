@@ -1,0 +1,4 @@
+ALEX TAYLOR - CURRICULUM VITAE
+Education: BS Computer Science
+Projects: RAG Pipeline, LLM Agents
+Publications: 1 Workshop Paper
