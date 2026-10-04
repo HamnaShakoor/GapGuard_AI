@@ -34,26 +34,35 @@ def get_welcome_report() -> ReadinessReport:
     return ReadinessReport(score=0.0, completed=0, missing=0, warnings=0, total=0, items=[], documents=[])
 
 
+def make_safe_doc(filename: str, doc_type_val: str, confidence: float) -> DocumentRecord:
+    """Helper to bypass Pydantic strict enum validation."""
+    try:
+        return DocumentRecord(filename=filename, doc_type=doc_type_val, confidence=confidence)
+    except Exception:
+        # Fallback to model_construct or direct dict assignment if validation fails
+        try:
+            return DocumentRecord.model_construct(
+                filename=filename,
+                doc_type=list(DocType)[0] if list(DocType) else doc_type_val,
+                confidence=confidence
+            )
+        except Exception:
+            return DocumentRecord.construct(
+                filename=filename,
+                confidence=confidence
+            )
+
+
 def generate_sample_report(req_pdf, user_docs) -> ReadinessReport:
     """Mock analysis output to visualize the dashboard UI smoothly."""
     docs = []
 
-    # Get valid DocType enum member dynamically to prevent validation errors
-    guideline_enum = getattr(DocType, "GUIDELINE", getattr(DocType, "GUIDELINES", list(DocType)[0] if list(DocType) else "GUIDELINE"))
-    applicant_enum = getattr(DocType, "APPLICANT", getattr(DocType, "SUBMISSION", list(DocType)[-1] if list(DocType) else "APPLICANT"))
-
     if req_pdf:
-        try:
-            docs.append(DocumentRecord(filename=req_pdf.name, doc_type=guideline_enum, confidence=0.98))
-        except Exception:
-            docs.append(DocumentRecord.model_construct(filename=req_pdf.name, doc_type=guideline_enum, confidence=0.98))
+        docs.append(make_safe_doc(req_pdf.name, "GUIDELINE", 0.98))
 
     if user_docs:
         for doc in user_docs:
-            try:
-                docs.append(DocumentRecord(filename=doc.name, doc_type=applicant_enum, confidence=0.92))
-            except Exception:
-                docs.append(DocumentRecord.model_construct(filename=doc.name, doc_type=applicant_enum, confidence=0.92))
+            docs.append(make_safe_doc(doc.name, "APPLICANT", 0.92))
 
     first_doc_name = user_docs[0].name if user_docs else "submitted_document.pdf"
     last_doc_name = user_docs[-1].name if user_docs and len(user_docs) > 1 else "additional_doc.pdf"
@@ -98,7 +107,6 @@ if "report" not in st.session_state:
 
 with st.sidebar:
     st.header("📥 Upload Center")
-    # Generic Labels
     req_pdf = st.file_uploader("Upload Guidelines / Program Criteria (PDF)", type=["pdf"])
     user_docs = st.file_uploader("Upload Applicant / Submission Documents", type=["pdf", "docx"], accept_multiple_files=True)
 
@@ -129,3 +137,4 @@ if report.total > 0:
 
     with tab2:
         render_action_center(report)
+        
