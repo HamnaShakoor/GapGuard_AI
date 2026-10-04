@@ -37,17 +37,23 @@ def get_welcome_report() -> ReadinessReport:
 def generate_sample_report(req_pdf, user_docs) -> ReadinessReport:
     """Mock analysis output to visualize the dashboard UI smoothly."""
     docs = []
-    
-    # Safely select valid DocType enum member or string
-    doc_type_guideline = getattr(DocType, "GUIDELINE", getattr(DocType, "GUIDELINES", "GUIDELINE"))
-    doc_type_applicant = getattr(DocType, "APPLICANT", "APPLICANT")
+
+    # Get valid DocType enum member dynamically to prevent validation errors
+    guideline_enum = getattr(DocType, "GUIDELINE", getattr(DocType, "GUIDELINES", list(DocType)[0] if list(DocType) else "GUIDELINE"))
+    applicant_enum = getattr(DocType, "APPLICANT", getattr(DocType, "SUBMISSION", list(DocType)[-1] if list(DocType) else "APPLICANT"))
 
     if req_pdf:
-        docs.append(DocumentRecord(filename=req_pdf.name, doc_type=doc_type_guideline, confidence=0.98))
-    
+        try:
+            docs.append(DocumentRecord(filename=req_pdf.name, doc_type=guideline_enum, confidence=0.98))
+        except Exception:
+            docs.append(DocumentRecord.model_construct(filename=req_pdf.name, doc_type=guideline_enum, confidence=0.98))
+
     if user_docs:
         for doc in user_docs:
-            docs.append(DocumentRecord(filename=doc.name, doc_type=doc_type_applicant, confidence=0.92))
+            try:
+                docs.append(DocumentRecord(filename=doc.name, doc_type=applicant_enum, confidence=0.92))
+            except Exception:
+                docs.append(DocumentRecord.model_construct(filename=doc.name, doc_type=applicant_enum, confidence=0.92))
 
     first_doc_name = user_docs[0].name if user_docs else "submitted_document.pdf"
     last_doc_name = user_docs[-1].name if user_docs and len(user_docs) > 1 else "additional_doc.pdf"
