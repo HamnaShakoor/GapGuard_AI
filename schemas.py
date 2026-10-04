@@ -1,59 +1,71 @@
-# schemas.py
 from enum import Enum
-from typing import Literal, Optional, List
-from pydantic import BaseModel
+from typing import List, Dict, Optional, Any, Callable
+from pydantic import BaseModel, Field
+
+
+class RequirementType(str, Enum):
+    MANDATORY = "MANDATORY"
+    OPTIONAL = "OPTIONAL"
+
+
+class StatusEnum(str, Enum):
+    COMPLETE = "COMPLETE"
+    MISSING = "MISSING"
+    WARNING = "WARNING"
+
 
 class DocType(str, Enum):
-    CNIC = "CNIC"
     TRANSCRIPT = "TRANSCRIPT"
     CV = "CV"
-    PHOTO = "PHOTO"
-    RECOMMENDATION = "RECOMMENDATION"
-    STATEMENT = "STATEMENT"
-    ENROLLMENT = "ENROLLMENT"
-    INCOME = "INCOME"
+    RECOMMENDATION_LETTER = "RECOMMENDATION_LETTER"
+    PERSONAL_STATEMENT = "PERSONAL_STATEMENT"
+    REQUIREMENTS_SPEC = "REQUIREMENTS_SPEC"
     UNKNOWN = "UNKNOWN"
 
-class DocumentRecord(BaseModel):
-    filename: str
-    doc_type: DocType
-    confidence: float
-    text: str
-    fields: dict
 
-class Requirement(BaseModel):
-    id: str
-    name: str
-    category: str  # documents | eligibility | deadline | financial | academic
-    mandatory: bool
-    description: str
-    generatable: Optional[str] = None  # "personal_statement" | "recommendation_email" | None
-    source_section: str
-    source_page: int
+class DocumentRecord(BaseModel):
+    doc_id: str
+    file_name: str
+    doc_type: DocType
+    extracted_text: str
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
 
 class Evidence(BaseModel):
-    text: str
-    section: str
-    page: int
+    source_file: str
+    section: Optional[str] = None
+    page: Optional[int] = None
+    text_snippet: str
 
-class GapItem(BaseModel):
+
+class Requirement(BaseModel):
+    req_id: str
+    description: str
+    req_type: RequirementType
+    generatable: bool = False
+
+
+class GapAnalysisItem(BaseModel):
     requirement: Requirement
-    status: Literal["COMPLETE", "MISSING", "WARNING"]
-    matched_file: Optional[str] = None
-    reason: str
-    evidence: Evidence
+    status: StatusEnum
+    evidence: Optional[Evidence] = None
+    notes: Optional[str] = None
+
 
 class ReadinessReport(BaseModel):
-    score: float
-    completed: int
-    missing: int
-    warnings: int
-    total: int
-    items: List[GapItem]
-    documents: List[DocumentRecord]
+    overall_score: float
+    total_requirements: int
+    completed_count: int
+    missing_count: int
+    warning_count: int
+    gap_items: List[GapAnalysisItem]
 
-class GeneratedContent(BaseModel):
-    kind: str
-    title: str
-    body: str
-    placeholders: List[str]
+
+class GenerationOutput(BaseModel):
+    generated_text: str
+    doc_type: str
+    placeholders_used: List[str] = Field(default_factory=list)
+
+
+# Step Callback Type Signature for UI updates
+StepCallback = Callable[[str, str], None]
