@@ -34,29 +34,38 @@ def get_welcome_report() -> ReadinessReport:
     return ReadinessReport(score=0.0, completed=0, missing=0, warnings=0, total=0, items=[], documents=[])
 
 
-def get_doc_type_enum(name: str):
-    """Safely fetch enum member or fallback to existing enum members."""
-    if hasattr(DocType, name):
-        return getattr(DocType, name)
-    enums = list(DocType)
-    if enums:
-        return enums[0] if name == "GUIDELINE" else enums[-1]
-    return name
+def create_safe_document(filename, doc_type_enum, confidence):
+    """Bypasses Pydantic strict validation on DocumentRecord."""
+    try:
+        return DocumentRecord(filename=filename, doc_type=doc_type_enum, confidence=confidence)
+    except Exception:
+        try:
+            return DocumentRecord.model_construct(
+                filename=filename,
+                doc_type=doc_type_enum,
+                confidence=confidence
+            )
+        except Exception:
+            return DocumentRecord.construct(
+                filename=filename,
+                doc_type=doc_type_enum,
+                confidence=confidence
+            )
 
 
 def generate_sample_report(req_pdf, user_docs) -> ReadinessReport:
     """Mock analysis output to visualize the dashboard UI smoothly."""
     docs = []
 
-    guideline_type = get_doc_type_enum("GUIDELINE")
-    applicant_type = get_doc_type_enum("APPLICANT")
+    guideline_type = getattr(DocType, "GUIDELINE", getattr(DocType, "GUIDELINES", list(DocType)[0] if list(DocType) else "GUIDELINE"))
+    applicant_type = getattr(DocType, "APPLICANT", getattr(DocType, "SUBMISSION", list(DocType)[-1] if list(DocType) else "APPLICANT"))
 
     if req_pdf:
-        docs.append(DocumentRecord(filename=req_pdf.name, doc_type=guideline_type, confidence=0.98))
+        docs.append(create_safe_document(req_pdf.name, guideline_type, 0.98))
 
     if user_docs:
         for doc in user_docs:
-            docs.append(DocumentRecord(filename=doc.name, doc_type=applicant_type, confidence=0.92))
+            docs.append(create_safe_document(doc.name, applicant_type, 0.92))
 
     first_doc_name = user_docs[0].name if user_docs else "submitted_document.pdf"
     last_doc_name = user_docs[-1].name if user_docs and len(user_docs) > 1 else "additional_doc.pdf"
