@@ -1,24 +1,14 @@
-from schemas import Evidence, GapItem, Requirement
+from schemas import GapAnalysisItem, Requirement
 from utils.scoring import compute_score, count_statuses
 
 
 def make(status, mandatory=True):
     req = Requirement(
-        id="r",
-        name="n",
-        category="documents",
-        mandatory=mandatory,
+        req_id="r",
         description="d",
-        source_section="Section 1",
-        source_page=1,
+        req_type="MANDATORY" if mandatory else "OPTIONAL",
     )
-    return GapItem(
-        requirement=req,
-        status=status,
-        matched_file=None,
-        reason="",
-        evidence=Evidence(text="d", section="Section 1", page=1),
-    )
+    return GapAnalysisItem(requirement=req, status=status)
 
 
 def test_all_complete():

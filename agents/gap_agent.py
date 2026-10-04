@@ -4,7 +4,14 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel
 
-from schemas import DocumentRecord, Evidence, GapItem, ReadinessReport, Requirement
+from schemas import (
+    DocumentRecord,
+    Evidence,
+    GapAnalysisItem,
+    ReadinessReport,
+    Requirement,
+    StatusEnum,
+)
 from utils.scoring import compute_score, count_statuses
 
 PROMPT_PATH = os.path.join(
@@ -21,6 +28,7 @@ class GapVerdict(BaseModel):
 
     status: Literal["COMPLETE", "MISSING", "WARNING"]
     matched_file: Optional[str] = None
+    evidence_text: Optional[str] = None
     reason: str = ""
 
 
@@ -41,52 +49,35 @@ def summarize_documents(documents: List[DocumentRecord]) -> str:
     parts = []
     for d in documents:
         doc_type = getattr(d.doc_type, "value", d.doc_type)
-        fields = json.dumps(d.fields, ensure_ascii=False)
+        meta = json.dumps(d.metadata, ensure_ascii=False, default=str)
         parts.append(
-            f"--- File: {d.filename} (type: {doc_type}) ---\n"
-            f"Key fields: {fields}\n"
-            f"Text:\n{d.text[:MAX_TEXT_PER_DOC]}"
+            f"--- File: {d.file_name} (type: {doc_type}) ---\n"
+            f"Key fields: {meta}\n"
+            f"Text:\n{d.extracted_text[:MAX_TEXT_PER_DOC]}"
         )
     return "\n\n".join(parts)
-
-
-def _evidence_from(requirement: Requirement) -> Evidence:
-    """Where the requirement comes from in the scholarship document."""
-    return Evidence(
-        text=requirement.description,
-        section=requirement.source_section,
-        page=requirement.source_page,
-    )
 
 
 def analyze_requirement(
     requirement: Requirement,
     documents: List[DocumentRecord],
     llm_call=None,
-) -> GapItem:
-    """Check ONE requirement against the student's documents.
-
-    llm_call(prompt, schema) is Member 4's call_json by default.
-    Tests pass a fake function instead.
-    """
+) -> GapAnalysisItem:
+    """Check ONE requirement against the student's documents."""
     if llm_call is None:
         llm_call = _default_llm_call
 
-    evidence = _evidence_from(requirement)
-
     # Rule 1: no documents at all -> MISSING, no need to call the LLM
     if not documents:
-        return GapItem(
+        return GapAnalysisItem(
             requirement=requirement,
-            status="MISSING",
-            matched_file=None,
-            reason="No documents were uploaded.",
-            evidence=evidence,
+            status=StatusEnum.MISSING,
+            evidence=None,
+            notes="No documents were uploaded.",
         )
 
     prompt = load_prompt().format(
-        requirement_name=requirement.name,
-        requirement_category=requirement.category,
+        requirement_type=requirement.req_type.value,
         requirement_description=requirement.description,
         documents_summary=summarize_documents(documents),
     )
@@ -95,41 +86,48 @@ def analyze_requirement(
         verdict = llm_call(prompt, GapVerdict)
     except Exception:
         # If the LLM fails, do not crash the whole pipeline
-        return GapItem(
+        return GapAnalysisItem(
             requirement=requirement,
-            status="WARNING",
-            matched_file=None,
-            reason="Could not analyze this requirement automatically. Please check manually.",
-            evidence=evidence,
+            status=StatusEnum.WARNING,
+            evidence=None,
+            notes="Could not analyze this requirement automatically. Please check manually.",
         )
 
-    status = verdict.status
+    status = StatusEnum(verdict.status)
+    notes = verdict.reason.strip()
     matched_file = verdict.matched_file
-    reason = verdict.reason.strip()
 
     # Rule 2: the file the LLM names must really be one of the uploaded files
-    known_files = {d.filename for d in documents}
+    known_files = {d.file_name for d in documents}
     if matched_file not in known_files:
         matched_file = None
 
     # Rule 3: COMPLETE without a real matched file is not trustworthy
-    if status == "COMPLETE" and matched_file is None:
-        status = "WARNING"
-        reason = "Marked complete but no matching uploaded file was found. Please check manually."
+    if status == StatusEnum.COMPLETE and matched_file is None:
+        status = StatusEnum.WARNING
+        notes = "Marked complete but no matching uploaded file was found. Please check manually."
 
-    # MISSING means no matched file by definition
-    if status == "MISSING":
+    # MISSING means no evidence by definition
+    if status == StatusEnum.MISSING:
         matched_file = None
 
-    return GapItem(
+    evidence = None
+    if matched_file is not None:
+        evidence = Evidence(
+            source_file=matched_file,
+            section=None,
+            page=None,
+            text_snippet=(verdict.evidence_text or notes or "").strip(),
+        )
+
+    return GapAnalysisItem(
         requirement=requirement,
         status=status,
-        matched_file=matched_file,
-        reason=reason,
         evidence=evidence,
+        notes=notes,
     )
-    
-    
+
+
 def analyze_gaps(
     requirements: List[Requirement],
     documents: List[DocumentRecord],
@@ -139,11 +137,10 @@ def analyze_gaps(
     items = [analyze_requirement(req, documents, llm_call) for req in requirements]
     completed, missing, warnings = count_statuses(items)
     return ReadinessReport(
-        score=compute_score(items),
-        completed=completed,
-        missing=missing,
-        warnings=warnings,
-        total=len(items),
-        items=items,
-        documents=documents,
+        overall_score=compute_score(items),
+        total_requirements=len(items),
+        completed_count=completed,
+        missing_count=missing,
+        warning_count=warnings,
+        gap_items=items,
     )

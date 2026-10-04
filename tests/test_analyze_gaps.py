@@ -2,31 +2,25 @@ from agents.gap_agent import analyze_gaps
 from schemas import DocumentRecord, ReadinessReport, Requirement
 
 
-def make_req(rid, name, mandatory=True):
+def make_req(rid, text, mandatory=True):
     return Requirement(
-        id=rid,
-        name=name,
-        category="documents",
-        mandatory=mandatory,
-        description=f"{name} is required",
-        generatable=None,
-        source_section="Section 4",
-        source_page=4,
+        req_id=rid,
+        description=text,
+        req_type="MANDATORY" if mandatory else "OPTIONAL",
     )
 
 
-def make_doc(filename="transcript.pdf"):
+def make_doc(file_name="transcript.pdf"):
     return DocumentRecord(
-        filename=filename,
+        doc_id="d1",
+        file_name=file_name,
         doc_type="TRANSCRIPT",
-        confidence=0.9,
-        text="CGPA: 3.8",
-        fields={},
+        extracted_text="CGPA: 3.8",
+        metadata={},
     )
 
 
 def fake_llm(prompt, schema):
-    """Decides the verdict from the requirement name found in the prompt."""
     if "Transcript" in prompt:
         return schema(status="COMPLETE", matched_file="transcript.pdf", reason="CGPA 3.8")
     if "CV" in prompt:
@@ -35,33 +29,27 @@ def fake_llm(prompt, schema):
 
 
 def test_full_report():
-    reqs = [
-        make_req("R1", "Transcript"),
-        make_req("R2", "CV"),
-        make_req("R3", "Passport Photo"),
-    ]
+    reqs = [make_req("R1", "Transcript"), make_req("R2", "CV"), make_req("R3", "Passport Photo")]
     report = analyze_gaps(reqs, [make_doc()], fake_llm)
 
     assert isinstance(report, ReadinessReport)
-    assert report.total == 3
-    assert report.completed == 1
-    assert report.warnings == 1
-    assert report.missing == 1
-    assert len(report.items) == 3
-    assert len(report.documents) == 1
-    # (2*1.0 + 2*0.5 + 2*0.0) / 6 = 50.0
-    assert report.score == 50.0
+    assert report.total_requirements == 3
+    assert report.completed_count == 1
+    assert report.warning_count == 1
+    assert report.missing_count == 1
+    assert len(report.gap_items) == 3
+    assert report.overall_score == 50.0
 
 
 def test_no_requirements():
     report = analyze_gaps([], [make_doc()], fake_llm)
-    assert report.total == 0
-    assert report.score == 0.0
-    assert report.items == []
+    assert report.total_requirements == 0
+    assert report.overall_score == 0.0
+    assert report.gap_items == []
 
 
 def test_no_documents_everything_missing():
     reqs = [make_req("R1", "Transcript"), make_req("R2", "CV")]
     report = analyze_gaps(reqs, [], fake_llm)
-    assert report.missing == 2
-    assert report.score == 0.0
+    assert report.missing_count == 2
+    assert report.overall_score == 0.0

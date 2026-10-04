@@ -1,9 +1,8 @@
 from agents.requirement_agent import extract_requirements
-from schemas import Requirement
+from schemas import Requirement, RequirementType
 
 
 def make_fake(items):
-    """Fake call_json: returns the given items wrapped in the schema it receives."""
     calls = {}
 
     def fake(prompt, schema):
@@ -15,35 +14,17 @@ def make_fake(items):
 
 def test_basic_extraction():
     fake, _ = make_fake([
-        {
-            "id": "R1",
-            "name": "Official Transcript",
-            "category": "documents",
-            "mandatory": True,
-            "description": "Official transcript with CGPA",
-            "generatable": None,
-            "source_section": "Section 4",
-            "source_page": 4,
-        },
-        {
-            "id": "R2",
-            "name": "Personal Statement",
-            "category": "documents",
-            "mandatory": False,
-            "description": "Max 500 words",
-            "generatable": "personal_statement",
-            "source_section": "Section 5",
-            "source_page": 5,
-        },
+        {"req_id": "R1", "description": "Official transcript", "req_type": "MANDATORY", "generatable": False},
+        {"req_id": "R2", "description": "Personal statement", "req_type": "OPTIONAL", "generatable": True},
     ])
     reqs = extract_requirements("some text", fake)
 
     assert len(reqs) == 2
     assert all(isinstance(r, Requirement) for r in reqs)
-    assert reqs[0].mandatory is True
-    assert reqs[0].generatable is None
-    assert reqs[1].generatable == "personal_statement"
-    assert reqs[0].source_page == 4
+    assert reqs[0].req_type == RequirementType.MANDATORY
+    assert reqs[1].req_type == RequirementType.OPTIONAL
+    assert reqs[0].generatable is False
+    assert reqs[1].generatable is True
 
 
 def test_prompt_contains_requirements_text():
@@ -53,48 +34,25 @@ def test_prompt_contains_requirements_text():
 
 
 def test_missing_id_gets_auto_id():
-    fake, _ = make_fake([
-        {
-            "name": "CV",
-            "category": "documents",
-            "mandatory": True,
-            "description": "Updated CV",
-        }
-    ])
+    fake, _ = make_fake([{"description": "Updated CV", "req_type": "MANDATORY"}])
     reqs = extract_requirements("text", fake)
-    assert reqs[0].id == "R1"
-    assert reqs[0].source_page == 0
+    assert reqs[0].req_id == "R1"
 
 
 def test_bad_item_is_skipped():
     fake, _ = make_fake([
-        {"id": "R1"},  # missing name, category, mandatory, description
-        {
-            "id": "R2",
-            "name": "CV",
-            "category": "documents",
-            "mandatory": True,
-            "description": "Updated CV",
-        },
+        {"req_id": "R1"},  # no description
+        {"req_id": "R2", "description": "CV", "req_type": "MANDATORY"},
     ])
     reqs = extract_requirements("text", fake)
     assert len(reqs) == 1
-    assert reqs[0].id == "R2"
+    assert reqs[0].req_id == "R2"
 
 
-def test_unknown_generatable_becomes_none():
-    fake, _ = make_fake([
-        {
-            "id": "R1",
-            "name": "CV",
-            "category": "documents",
-            "mandatory": True,
-            "description": "Updated CV",
-            "generatable": "something_random",
-        }
-    ])
+def test_unknown_req_type_defaults_to_mandatory():
+    fake, _ = make_fake([{"req_id": "R1", "description": "CV", "req_type": "weird"}])
     reqs = extract_requirements("text", fake)
-    assert reqs[0].generatable is None
+    assert reqs[0].req_type == RequirementType.MANDATORY
 
 
 def test_empty_response():

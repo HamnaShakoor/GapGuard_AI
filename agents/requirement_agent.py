@@ -11,7 +11,7 @@ PROMPT_PATH = os.path.join(
     "requirement_prompt.txt",
 )
 
-ALLOWED_GENERATABLE = {"personal_statement", "recommendation_email"}
+TRUE_WORDS = {"true", "yes", "personal_statement", "recommendation_email"}
 
 
 class RawRequirements(BaseModel):
@@ -33,11 +33,7 @@ def _default_llm_call(prompt, schema):
 
 
 def extract_requirements(requirements_text: str, llm_call=None) -> List[Requirement]:
-    """Turn raw scholarship requirements text into a list of Requirement objects.
-
-    llm_call(prompt, schema) is Member 4's call_json by default.
-    Tests pass a fake function instead.
-    """
+    """Turn raw scholarship requirements text into a list of Requirement objects."""
     if llm_call is None:
         llm_call = _default_llm_call
 
@@ -47,16 +43,23 @@ def extract_requirements(requirements_text: str, llm_call=None) -> List[Requirem
     results = []
     for i, item in enumerate(raw.requirements, start=1):
         item = dict(item)
-        item.setdefault("id", f"R{i}")
-        if item.get("source_page") is None:
-            item["source_page"] = 0
-        if item.get("source_section") is None:
-            item["source_section"] = ""
-        if item.get("generatable") not in ALLOWED_GENERATABLE:
-            item["generatable"] = None
+        item.setdefault("req_id", item.get("id") or f"R{i}")
+
+        req_type = str(item.get("req_type", "")).strip().upper()
+        item["req_type"] = req_type if req_type in ("MANDATORY", "OPTIONAL") else "MANDATORY"
+
+        gen = item.get("generatable")
+        item["generatable"] = gen is True or str(gen).strip().lower() in TRUE_WORDS
+
         try:
-            results.append(Requirement(**item))
+            results.append(
+                Requirement(
+                    req_id=str(item["req_id"]),
+                    description=item.get("description"),
+                    req_type=item["req_type"],
+                    generatable=item["generatable"],
+                )
+            )
         except (ValidationError, TypeError):
-            # Skip a malformed item instead of crashing the whole pipeline
-            continue
+            continue  # skip a malformed item instead of crashing everything
     return results
