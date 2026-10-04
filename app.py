@@ -34,59 +34,58 @@ def get_welcome_report() -> ReadinessReport:
     return ReadinessReport(score=0.0, completed=0, missing=0, warnings=0, total=0, items=[], documents=[])
 
 
-def safe_instantiate(model_cls, **kwargs):
-    """Instantiate a Pydantic model safely without triggering validation errors."""
-    try:
-        return model_cls(**kwargs)
-    except Exception:
-        try:
-            return model_cls.model_construct(**kwargs)
-        except Exception:
-            return model_cls.construct(**kwargs)
+def get_doc_type_enum(name: str):
+    """Safely fetch enum member or fallback to existing enum members."""
+    if hasattr(DocType, name):
+        return getattr(DocType, name)
+    enums = list(DocType)
+    if enums:
+        return enums[0] if name == "GUIDELINE" else enums[-1]
+    return name
 
 
 def generate_sample_report(req_pdf, user_docs) -> ReadinessReport:
     """Mock analysis output to visualize the dashboard UI smoothly."""
     docs = []
 
+    guideline_type = get_doc_type_enum("GUIDELINE")
+    applicant_type = get_doc_type_enum("APPLICANT")
+
     if req_pdf:
-        docs.append(safe_instantiate(DocumentRecord, filename=req_pdf.name, doc_type="GUIDELINE", confidence=0.98))
+        docs.append(DocumentRecord(filename=req_pdf.name, doc_type=guideline_type, confidence=0.98))
 
     if user_docs:
         for doc in user_docs:
-            docs.append(safe_instantiate(DocumentRecord, filename=doc.name, doc_type="APPLICANT", confidence=0.92))
+            docs.append(DocumentRecord(filename=doc.name, doc_type=applicant_type, confidence=0.92))
 
     first_doc_name = user_docs[0].name if user_docs else "submitted_document.pdf"
     last_doc_name = user_docs[-1].name if user_docs and len(user_docs) > 1 else "additional_doc.pdf"
 
-    req1 = safe_instantiate(Requirement, name="Primary Application / Transcripts", mandatory=True, category="Core Requirements")
-    ev1 = safe_instantiate(Evidence, text="Document verified against requirement guidelines.", section="Section 2.1", page=1)
+    req1 = Requirement(name="Primary Application / Transcripts", mandatory=True, category="Core Requirements")
+    ev1 = Evidence(text="Document verified against requirement guidelines.", section="Section 2.1", page=1)
 
-    req2 = safe_instantiate(Requirement, name="Recommendation / Verification Letter", mandatory=True, category="Verification")
-    ev2 = safe_instantiate(Evidence, text="Mandatory verification letter required for qualification.", section="Section 4.0", page=3)
+    req2 = Requirement(name="Recommendation / Verification Letter", mandatory=True, category="Verification")
+    ev2 = Evidence(text="Mandatory verification letter required for qualification.", section="Section 4.0", page=3)
 
-    req3 = safe_instantiate(Requirement, name="Statement / Cover Document", mandatory=False, category="Optional Criteria")
-    ev3 = safe_instantiate(Evidence, text="Recommended length: 500-1000 words.", section="Section 3.2", page=2)
+    req3 = Requirement(name="Statement / Cover Document", mandatory=False, category="Optional Criteria")
+    ev3 = Evidence(text="Recommended length: 500-1000 words.", section="Section 3.2", page=2)
 
     items = [
-        safe_instantiate(
-            GapItem,
+        GapItem(
             status="Complete",
             requirement=req1,
             reason="Submitted document matches mandatory specifications.",
             matched_file=first_doc_name,
             evidence=ev1
         ),
-        safe_instantiate(
-            GapItem,
+        GapItem(
             status="Missing",
             requirement=req2,
             reason="Required supporting verification document is missing from submission batch.",
             matched_file="",
             evidence=ev2
         ),
-        safe_instantiate(
-            GapItem,
+        GapItem(
             status="Warning",
             requirement=req3,
             reason="Document length or structure is slightly below suggested target guidelines.",
@@ -95,8 +94,7 @@ def generate_sample_report(req_pdf, user_docs) -> ReadinessReport:
         )
     ]
 
-    return safe_instantiate(
-        ReadinessReport,
+    return ReadinessReport(
         score=33.0,
         completed=1,
         missing=1,
@@ -142,4 +140,3 @@ if report.total > 0:
 
     with tab2:
         render_action_center(report)
-        
