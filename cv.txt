@@ -1,4 +1,2 @@
-ALEX TAYLOR - CURRICULUM VITAE
-Education: BS Computer Science
-Projects: RAG Pipeline, LLM Agents
-Publications: 1 Workshop Paper
+JORDAN LEE - CV
+Focus: Data Science & AI Research
