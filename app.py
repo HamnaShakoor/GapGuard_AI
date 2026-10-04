@@ -13,7 +13,7 @@ from ui.components import render_gap_item, render_uploaded_documents
 from ui.action_center import render_action_center
 from schemas import ReadinessReport, GapItem, Requirement, Evidence, DocumentRecord, DocType
 
-# Try importing backend orchestrator if available
+# Use the team's real backend if orchestrator.py exists, otherwise demo data
 try:
     from orchestrator import run_orchestrator
     HAS_BACKEND = True
@@ -34,84 +34,39 @@ def get_welcome_report() -> ReadinessReport:
     return ReadinessReport(score=0.0, completed=0, missing=0, warnings=0, total=0, items=[], documents=[])
 
 
-def create_safe_document(filename, doc_type_enum, confidence):
-    """Bypasses Pydantic strict validation on DocumentRecord."""
-    try:
-        return DocumentRecord(filename=filename, doc_type=doc_type_enum, confidence=confidence)
-    except Exception:
-        try:
-            return DocumentRecord.model_construct(
-                filename=filename,
-                doc_type=doc_type_enum,
-                confidence=confidence
-            )
-        except Exception:
-            return DocumentRecord.construct(
-                filename=filename,
-                doc_type=doc_type_enum,
-                confidence=confidence
-            )
-
-
 def generate_sample_report(req_pdf, user_docs) -> ReadinessReport:
-    """Mock analysis output to visualize the dashboard UI smoothly."""
-    docs = []
+    """Demo data. Uses exactly the same fields/values as the original working mock."""
+    types = [DocType.CNIC, DocType.TRANSCRIPT]
+    docs = [
+        DocumentRecord(filename=f.name, doc_type=types[i % 2], confidence=0.95, text="", fields={})
+        for i, f in enumerate(user_docs or [])
+    ]
+    name1 = docs[0].filename if docs else "CNIC_Front.pdf"
+    name2 = docs[1].filename if len(docs) > 1 else "BS_Transcript.pdf"
 
-    guideline_type = getattr(DocType, "GUIDELINE", getattr(DocType, "GUIDELINES", list(DocType)[0] if list(DocType) else "GUIDELINE"))
-    applicant_type = getattr(DocType, "APPLICANT", getattr(DocType, "SUBMISSION", list(DocType)[-1] if list(DocType) else "APPLICANT"))
+    req1 = Requirement(id="R1", name="National Identity Card (CNIC)", category="documents", mandatory=True,
+                       description="Clear identity proof", source_section="Section 1.1", source_page=1)
+    req2 = Requirement(id="R2", name="Academic Transcript", category="academic", mandatory=True,
+                       description="Official university transcript", source_section="Section 2.1", source_page=2)
+    req3 = Requirement(id="R3", name="Statement of Purpose", category="documents", mandatory=True,
+                       description="500-word SOP", generatable="personal_statement",
+                       source_section="Section 3.2", source_page=3)
+    req4 = Requirement(id="R4", name="Academic Recommendation Letter", category="documents", mandatory=True,
+                       description="Letter from professor", generatable="recommendation_email",
+                       source_section="Section 4.0", source_page=4)
 
-    if req_pdf:
-        docs.append(create_safe_document(req_pdf.name, guideline_type, 0.98))
-
-    if user_docs:
-        for doc in user_docs:
-            docs.append(create_safe_document(doc.name, applicant_type, 0.92))
-
-    first_doc_name = user_docs[0].name if user_docs else "submitted_document.pdf"
-    last_doc_name = user_docs[-1].name if user_docs and len(user_docs) > 1 else "additional_doc.pdf"
-
-    req1 = Requirement(name="Primary Application / Transcripts", mandatory=True, category="Core Requirements")
-    ev1 = Evidence(text="Document verified against requirement guidelines.", section="Section 2.1", page=1)
-
-    req2 = Requirement(name="Recommendation / Verification Letter", mandatory=True, category="Verification")
-    ev2 = Evidence(text="Mandatory verification letter required for qualification.", section="Section 4.0", page=3)
-
-    req3 = Requirement(name="Statement / Cover Document", mandatory=False, category="Optional Criteria")
-    ev3 = Evidence(text="Recommended length: 500-1000 words.", section="Section 3.2", page=2)
+    ev1 = Evidence(text="Applicants must provide valid government-issued CNIC.", section="Section 1.1", page=1)
+    ev2 = Evidence(text="Minimum CGPA 3.0 transcript required.", section="Section 2.1", page=2)
+    ev3 = Evidence(text="A 500-word statement is required.", section="Section 3.2", page=3)
+    ev4 = Evidence(text="One academic reference letter is required.", section="Section 4.0", page=4)
 
     items = [
-        GapItem(
-            status="Complete",
-            requirement=req1,
-            reason="Submitted document matches mandatory specifications.",
-            matched_file=first_doc_name,
-            evidence=ev1
-        ),
-        GapItem(
-            status="Missing",
-            requirement=req2,
-            reason="Required supporting verification document is missing from submission batch.",
-            matched_file="",
-            evidence=ev2
-        ),
-        GapItem(
-            status="Warning",
-            requirement=req3,
-            reason="Document length or structure is slightly below suggested target guidelines.",
-            matched_file=last_doc_name,
-            evidence=ev3
-        )
+        GapItem(requirement=req1, status="COMPLETE", matched_file=name1, reason="Valid CNIC provided.", evidence=ev1),
+        GapItem(requirement=req2, status="COMPLETE", matched_file=name2, reason="Transcript meets the threshold.", evidence=ev2),
+        GapItem(requirement=req3, status="MISSING", matched_file=None, reason="No SOP found.", evidence=ev3),
+        GapItem(requirement=req4, status="MISSING", matched_file=None, reason="No recommendation letter attached.", evidence=ev4),
     ]
-
-    return ReadinessReport(
-        score=33.0,
-        completed=1,
-        missing=1,
-        warnings=1,
-        total=3,
-        items=items,
-        documents=docs
-    )
+    return ReadinessReport(score=50.0, completed=2, missing=2, warnings=0, total=4, items=items, documents=docs)
 
 
 if "report" not in st.session_state:
@@ -127,11 +82,16 @@ with st.sidebar:
             st.warning("Please upload guidelines or applicant documents first.")
         else:
             with st.spinner("Analyzing documents with GapGuard AI agents..."):
-                if HAS_BACKEND:
-                    st.session_state["report"] = run_orchestrator(req_pdf, user_docs)
-                else:
-                    st.session_state["report"] = generate_sample_report(req_pdf, user_docs)
-            st.success("Analysis complete!")
+                try:
+                    if HAS_BACKEND:
+                        st.session_state["report"] = run_orchestrator(req_pdf, user_docs)
+                    else:
+                        st.session_state["report"] = generate_sample_report(req_pdf, user_docs)
+                    st.success("Analysis complete!")
+                    if not HAS_BACKEND:
+                        st.info("Demo mode: showing sample results while the backend is being integrated.")
+                except Exception as e:
+                    st.error(f"Analysis failed: {type(e).__name__}: {e}")
 
     st.markdown("---")
     if st.session_state["report"].documents:
