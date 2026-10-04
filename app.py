@@ -35,34 +35,44 @@ def get_welcome_report() -> ReadinessReport:
 
 
 def generate_sample_report(req_pdf, user_docs) -> ReadinessReport:
-    """Mock analysis output to visualize the dashboard UI."""
+    """Mock analysis output to visualize the dashboard UI smoothly."""
     docs = []
+    
+    # Safely select valid DocType enum member or string
+    doc_type_guideline = getattr(DocType, "GUIDELINE", getattr(DocType, "GUIDELINES", "GUIDELINE"))
+    doc_type_applicant = getattr(DocType, "APPLICANT", "APPLICANT")
+
     if req_pdf:
-        docs.append(DocumentRecord(filename=req_pdf.name, doc_type=DocType.GUIDELINE, confidence=0.98))
-    for doc in user_docs:
-        docs.append(DocumentRecord(filename=doc.name, doc_type=DocType.APPLICANT, confidence=0.92))
+        docs.append(DocumentRecord(filename=req_pdf.name, doc_type=doc_type_guideline, confidence=0.98))
+    
+    if user_docs:
+        for doc in user_docs:
+            docs.append(DocumentRecord(filename=doc.name, doc_type=doc_type_applicant, confidence=0.92))
+
+    first_doc_name = user_docs[0].name if user_docs else "submitted_document.pdf"
+    last_doc_name = user_docs[-1].name if user_docs and len(user_docs) > 1 else "additional_doc.pdf"
 
     items = [
         GapItem(
             status="Complete",
-            requirement=Requirement(name="Academic Transcripts", mandatory=True, category="Academics"),
-            reason="Official transcript uploaded and verified.",
-            matched_file=user_docs[0].name if user_docs else "transcript.pdf",
-            evidence=Evidence(text="Transcript verified with GPA 3.8", section="Section 2.1", page=1)
+            requirement=Requirement(name="Primary Application / Transcripts", mandatory=True, category="Core Requirements"),
+            reason="Submitted document matches mandatory specifications.",
+            matched_file=first_doc_name,
+            evidence=Evidence(text="Document verified against requirement guidelines.", section="Section 2.1", page=1)
         ),
         GapItem(
             status="Missing",
-            requirement=Requirement(name="Letter of Recommendation", mandatory=True, category="Documents"),
-            reason="No recommendation letter attached in the applicant bundle.",
+            requirement=Requirement(name="Recommendation / Verification Letter", mandatory=True, category="Verification"),
+            reason="Required supporting verification document is missing from submission batch.",
             matched_file="",
-            evidence=Evidence(text="Two reference letters required.", section="Section 4.0", page=3)
+            evidence=Evidence(text="Mandatory verification letter required for qualification.", section="Section 4.0", page=3)
         ),
         GapItem(
             status="Warning",
-            requirement=Requirement(name="Statement of Purpose", mandatory=False, category="Essays"),
-            reason="Word count is slightly below recommended guidelines (450/500 words).",
-            matched_file=user_docs[-1].name if len(user_docs) > 1 else "sop.pdf",
-            evidence=Evidence(text="SOP should be between 500-1000 words.", section="Section 3.2", page=2)
+            requirement=Requirement(name="Statement / Cover Document", mandatory=False, category="Optional Criteria"),
+            reason="Document length or structure is slightly below suggested target guidelines.",
+            matched_file=last_doc_name,
+            evidence=Evidence(text="Recommended length: 500-1000 words.", section="Section 3.2", page=2)
         )
     ]
 
@@ -82,8 +92,9 @@ if "report" not in st.session_state:
 
 with st.sidebar:
     st.header("📥 Upload Center")
-    req_pdf = st.file_uploader("Upload Scholarship Guidelines (PDF)", type=["pdf"])
-    user_docs = st.file_uploader("Upload Applicant Documents", type=["pdf", "docx"], accept_multiple_files=True)
+    # Generic Labels
+    req_pdf = st.file_uploader("Upload Guidelines / Program Criteria (PDF)", type=["pdf"])
+    user_docs = st.file_uploader("Upload Applicant / Submission Documents", type=["pdf", "docx"], accept_multiple_files=True)
 
     if st.button("🚀 Run GapGuard Analysis", type="primary"):
         if not req_pdf and not user_docs:
@@ -91,10 +102,8 @@ with st.sidebar:
         else:
             with st.spinner("Analyzing documents with GapGuard AI agents..."):
                 if HAS_BACKEND:
-                    # Calls your team's real multi-agent pipeline
                     st.session_state["report"] = run_orchestrator(req_pdf, user_docs)
                 else:
-                    # Fallback UI visualization
                     st.session_state["report"] = generate_sample_report(req_pdf, user_docs)
             st.success("Analysis complete!")
 
