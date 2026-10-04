@@ -34,23 +34,15 @@ def get_welcome_report() -> ReadinessReport:
     return ReadinessReport(score=0.0, completed=0, missing=0, warnings=0, total=0, items=[], documents=[])
 
 
-def make_safe_doc(filename: str, doc_type_val: str, confidence: float) -> DocumentRecord:
-    """Helper to bypass Pydantic strict enum validation."""
+def safe_instantiate(model_cls, **kwargs):
+    """Instantiate a Pydantic model safely without triggering validation errors."""
     try:
-        return DocumentRecord(filename=filename, doc_type=doc_type_val, confidence=confidence)
+        return model_cls(**kwargs)
     except Exception:
-        # Fallback to model_construct or direct dict assignment if validation fails
         try:
-            return DocumentRecord.model_construct(
-                filename=filename,
-                doc_type=list(DocType)[0] if list(DocType) else doc_type_val,
-                confidence=confidence
-            )
+            return model_cls.model_construct(**kwargs)
         except Exception:
-            return DocumentRecord.construct(
-                filename=filename,
-                confidence=confidence
-            )
+            return model_cls.construct(**kwargs)
 
 
 def generate_sample_report(req_pdf, user_docs) -> ReadinessReport:
@@ -58,40 +50,53 @@ def generate_sample_report(req_pdf, user_docs) -> ReadinessReport:
     docs = []
 
     if req_pdf:
-        docs.append(make_safe_doc(req_pdf.name, "GUIDELINE", 0.98))
+        docs.append(safe_instantiate(DocumentRecord, filename=req_pdf.name, doc_type="GUIDELINE", confidence=0.98))
 
     if user_docs:
         for doc in user_docs:
-            docs.append(make_safe_doc(doc.name, "APPLICANT", 0.92))
+            docs.append(safe_instantiate(DocumentRecord, filename=doc.name, doc_type="APPLICANT", confidence=0.92))
 
     first_doc_name = user_docs[0].name if user_docs else "submitted_document.pdf"
     last_doc_name = user_docs[-1].name if user_docs and len(user_docs) > 1 else "additional_doc.pdf"
 
+    req1 = safe_instantiate(Requirement, name="Primary Application / Transcripts", mandatory=True, category="Core Requirements")
+    ev1 = safe_instantiate(Evidence, text="Document verified against requirement guidelines.", section="Section 2.1", page=1)
+
+    req2 = safe_instantiate(Requirement, name="Recommendation / Verification Letter", mandatory=True, category="Verification")
+    ev2 = safe_instantiate(Evidence, text="Mandatory verification letter required for qualification.", section="Section 4.0", page=3)
+
+    req3 = safe_instantiate(Requirement, name="Statement / Cover Document", mandatory=False, category="Optional Criteria")
+    ev3 = safe_instantiate(Evidence, text="Recommended length: 500-1000 words.", section="Section 3.2", page=2)
+
     items = [
-        GapItem(
+        safe_instantiate(
+            GapItem,
             status="Complete",
-            requirement=Requirement(name="Primary Application / Transcripts", mandatory=True, category="Core Requirements"),
+            requirement=req1,
             reason="Submitted document matches mandatory specifications.",
             matched_file=first_doc_name,
-            evidence=Evidence(text="Document verified against requirement guidelines.", section="Section 2.1", page=1)
+            evidence=ev1
         ),
-        GapItem(
+        safe_instantiate(
+            GapItem,
             status="Missing",
-            requirement=Requirement(name="Recommendation / Verification Letter", mandatory=True, category="Verification"),
+            requirement=req2,
             reason="Required supporting verification document is missing from submission batch.",
             matched_file="",
-            evidence=Evidence(text="Mandatory verification letter required for qualification.", section="Section 4.0", page=3)
+            evidence=ev2
         ),
-        GapItem(
+        safe_instantiate(
+            GapItem,
             status="Warning",
-            requirement=Requirement(name="Statement / Cover Document", mandatory=False, category="Optional Criteria"),
+            requirement=req3,
             reason="Document length or structure is slightly below suggested target guidelines.",
             matched_file=last_doc_name,
-            evidence=Evidence(text="Recommended length: 500-1000 words.", section="Section 3.2", page=2)
+            evidence=ev3
         )
     ]
 
-    return ReadinessReport(
+    return safe_instantiate(
+        ReadinessReport,
         score=33.0,
         completed=1,
         missing=1,
