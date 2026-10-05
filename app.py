@@ -35,14 +35,16 @@ def get_welcome_report() -> ReadinessReport:
 
 
 def generate_sample_report(req_pdf, user_docs) -> ReadinessReport:
-    """Demo data. Uses exactly the same fields/values as the original working mock."""
+    """Dynamic sample report that reflects whether applicant documents were actually uploaded."""
     types = [DocType.CNIC, DocType.TRANSCRIPT]
     docs = [
-        DocumentRecord(filename=f.name, doc_type=types[i % 2], confidence=0.95, text="", fields={})
+        DocumentRecord(filename=f.name, doc_type=types[i % len(types)], confidence=0.95, text="", fields={})
         for i, f in enumerate(user_docs or [])
     ]
-    name1 = docs[0].filename if docs else "CNIC_Front.pdf"
-    name2 = docs[1].filename if len(docs) > 1 else "BS_Transcript.pdf"
+    
+    has_docs = len(docs) > 0
+    name1 = docs[0].filename if has_docs else None
+    name2 = docs[1].filename if len(docs) > 1 else None
 
     req1 = Requirement(id="R1", name="National Identity Card (CNIC)", category="documents", mandatory=True,
                        description="Clear identity proof", source_section="Section 1.1", source_page=1)
@@ -60,13 +62,33 @@ def generate_sample_report(req_pdf, user_docs) -> ReadinessReport:
     ev3 = Evidence(text="A 500-word statement is required.", section="Section 3.2", page=3)
     ev4 = Evidence(text="One academic reference letter is required.", section="Section 4.0", page=4)
 
+    # Dynamic status matching uploaded user documents
+    status1 = "COMPLETE" if has_docs else "MISSING"
+    reason1 = "Valid CNIC provided." if has_docs else "No CNIC attached in submission."
+
+    status2 = "COMPLETE" if len(docs) > 1 else "MISSING"
+    reason2 = "Transcript meets the threshold." if len(docs) > 1 else "No transcript attached in submission."
+
     items = [
-        GapItem(requirement=req1, status="COMPLETE", matched_file=name1, reason="Valid CNIC provided.", evidence=ev1),
-        GapItem(requirement=req2, status="COMPLETE", matched_file=name2, reason="Transcript meets the threshold.", evidence=ev2),
+        GapItem(requirement=req1, status=status1, matched_file=name1, reason=reason1, evidence=ev1),
+        GapItem(requirement=req2, status=status2, matched_file=name2, reason=reason2, evidence=ev2),
         GapItem(requirement=req3, status="MISSING", matched_file=None, reason="No SOP found.", evidence=ev3),
         GapItem(requirement=req4, status="MISSING", matched_file=None, reason="No recommendation letter attached.", evidence=ev4),
     ]
-    return ReadinessReport(score=50.0, completed=2, missing=2, warnings=0, total=4, items=items, documents=docs)
+
+    completed_count = sum(1 for item in items if item.status == "COMPLETE")
+    missing_count = sum(1 for item in items if item.status == "MISSING")
+    score_val = round((completed_count / 4.0) * 100, 1)
+
+    return ReadinessReport(
+        score=score_val,
+        completed=completed_count,
+        missing=missing_count,
+        warnings=0,
+        total=4,
+        items=items,
+        documents=docs
+    )
 
 
 if "report" not in st.session_state:
